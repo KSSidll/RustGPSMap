@@ -1,10 +1,12 @@
 use std::fs::File;
-use crate::data::{Path, Point};
+use data::{Path, Point, read_from_file};
 
 mod data;
 
-fn main() {
-    let mut file = File::create("this.txt").unwrap();
+const DATA_FILENAME: &str = "data.txt";
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = File::create(DATA_FILENAME)?;
 
     let point1 = Point {
         x: 5.1f32,
@@ -21,7 +23,14 @@ fn main() {
         end: point2.clone(),
     };
 
-    point1.save_to_file(&mut file).unwrap();
-    point2.save_to_file(&mut file).unwrap();
-    path.save_to_file(&mut file).unwrap();
+    point1.save_to_file(&mut file)?;
+    point2.save_to_file(&mut file)?;
+    path.save_to_file(&mut file)?;
+
+    let (points, paths) = read_from_file(DATA_FILENAME)?;
+
+    println!("{:?}", points);
+    println!("{:?}", paths);
+
+    Ok(())
 }
