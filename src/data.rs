@@ -8,7 +8,6 @@ const POINT_FORMAT_START: &str = "Point";
 const PATH_FORMAT_START: &str = "Path";
 
 #[derive(Debug, Default, Clone)]
-#[allow(dead_code)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
@@ -28,13 +27,11 @@ impl Point {
 }
 
 #[derive(Debug, Default, Clone)]
-#[allow(dead_code)]
 pub struct Path {
     pub start: Point,
     pub end: Point,
 }
 
-#[allow(dead_code)]
 impl Path {
     pub fn save_to_file(&self, file: &mut File) -> std::io::Result<()>{
         let data = format!("{}:{}:{}:{}:{}\n", PATH_FORMAT_START, self.start.x, self.start.y, self.end.x, self.end.y);
@@ -43,7 +40,6 @@ impl Path {
     }
 }
 
-#[allow(dead_code)]
 pub fn read_from_file<P>(path: P) -> Result<(VecDeque<Point>, VecDeque<Path>), ReadError>
 where P: AsRef<std::path::Path>, {
     let mut points: VecDeque<Point> = VecDeque::new();
