@@ -6,25 +6,26 @@ mod data;
 const DATA_FILENAME: &str = "data.txt";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = File::create(DATA_FILENAME)?;
+    let mut file: File = File::create(DATA_FILENAME)?;
 
-    let point1 = Point {
-        x: 5.1f32,
-        y: 3f32,
-    };
+    const N: usize = 10;
+    const FROM: f32 = 0.0;
+    const UNTIL: f32 = 50.0;
+    const ACCURACY: f32 = 0.01;
 
-    let point2 = Point {
-        x: 1.1f32,
-        y: 7.2f32,
-    };
+    let points = [(); N].map(|_| {
+        Point::generate_random_proportional(FROM, UNTIL, ACCURACY)
+    });
+
+    for point in &points {
+        point.save_to_file(&mut file)?;
+    }
 
     let path = Path {
-        start: point1.clone(),
-        end: point2.clone(),
+        start: points[0].clone(),
+        end: points[1].clone(),
     };
 
-    point1.save_to_file(&mut file)?;
-    point2.save_to_file(&mut file)?;
     path.save_to_file(&mut file)?;
 
     let (points, paths) = read_from_file(DATA_FILENAME)?;
