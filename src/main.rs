@@ -2,6 +2,8 @@ use std::fs::File;
 use data::{Path, Point, read_from_file};
 
 mod data;
+mod util;
+mod graph;
 
 const DATA_FILENAME: &str = "data.txt";
 

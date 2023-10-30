@@ -1,10 +1,13 @@
 use core::fmt;
-use std::collections::VecDeque;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{VecDeque, BinaryHeap, HashMap};
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io::{Write, self, BufRead};
 use std::num::ParseFloatError;
+use std::cmp::Ordering;
 use std::result;
-use rand::{Rng, thread_rng};
+use crate::util::generate_random_f32;
 
 #[derive(Debug)]
 pub enum Error {
@@ -52,6 +55,27 @@ pub struct Point {
     pub y: f32,
 }
 
+impl Hash for Point {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.x.to_string().hash(state);
+        self.y.to_string().hash(state);
+    }
+}
+
+impl PartialEq for Point {
+    fn eq(&self, other: &Self) -> bool {
+        let mut self_hasher = DefaultHasher::new();
+        let mut other_hasher = DefaultHasher::new();
+
+        self.hash(&mut self_hasher);
+        other.hash(&mut other_hasher);
+
+        self_hasher.finish() == other_hasher.finish()
+    }
+}
+
+impl Eq for Point {}
+
 #[allow(dead_code)]
 impl Point {
     pub fn save_to_file(&self, file: &mut File) -> Result<()> {
@@ -66,8 +90,8 @@ impl Point {
 
     pub fn generate_random(from_x: f32, until_x: f32, accuracy_x: f32, from_y: f32, until_y: f32, accuracy_y: f32) -> Point {
         Point {
-            x: (thread_rng().gen_range(from_x..=until_x) * (1.0 / accuracy_x)).round() / (1.0 /accuracy_x),
-            y: (thread_rng().gen_range(from_y..=until_y) * (1.0 / accuracy_y)).round() / (1.0 /accuracy_y),
+            x: generate_random_f32(from_x, until_x, accuracy_x),
+            y: generate_random_f32(from_y, until_y, accuracy_y),
         }
     }
 
@@ -87,6 +111,10 @@ impl Path {
         let data = format!("{}:{}:{}:{}:{}\n", PATH_FORMAT_START, self.start.x, self.start.y, self.end.x, self.end.y);
 
         Ok(file.write_all(data.as_bytes())?)
+    }
+
+    pub fn length(&self) -> f32 {
+        self.start.distance_to(&self.end)
     }
 }
 
