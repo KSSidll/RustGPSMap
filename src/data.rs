@@ -1,12 +1,10 @@
 use core::fmt;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::{VecDeque, BinaryHeap, HashMap};
+use std::collections::VecDeque;
 use std::fs::File;
-use std::hash::{Hash, Hasher};
-use std::io::{Write, self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::num::ParseFloatError;
-use std::cmp::Ordering;
 use std::result;
+
 use crate::util::generate_random_f32;
 
 #[derive(Debug)]
@@ -44,37 +42,17 @@ impl From<io::Error> for Error {
         Error::IO(err)
     }
 }
+
 pub type Result<T> = result::Result<T, Error>;
 
 const POINT_FORMAT_START: &str = "Point";
 const PATH_FORMAT_START: &str = "Path";
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
 }
-
-impl Hash for Point {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.x.to_string().hash(state);
-        self.y.to_string().hash(state);
-    }
-}
-
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        let mut self_hasher = DefaultHasher::new();
-        let mut other_hasher = DefaultHasher::new();
-
-        self.hash(&mut self_hasher);
-        other.hash(&mut other_hasher);
-
-        self_hasher.finish() == other_hasher.finish()
-    }
-}
-
-impl Eq for Point {}
 
 #[allow(dead_code)]
 impl Point {
@@ -106,8 +84,9 @@ pub struct Path {
     pub end: Point,
 }
 
+#[allow(dead_code)]
 impl Path {
-    pub fn save_to_file(&self, file: &mut File) -> Result<()>{
+    pub fn save_to_file(&self, file: &mut File) -> Result<()> {
         let data = format!("{}:{}:{}:{}:{}\n", PATH_FORMAT_START, self.start.x, self.start.y, self.end.x, self.end.y);
 
         Ok(file.write_all(data.as_bytes())?)
@@ -118,8 +97,8 @@ impl Path {
     }
 }
 
-pub fn read_from_file<P>(path: P) -> Result<(VecDeque<Point>, VecDeque<Path>)>
-where P: AsRef<std::path::Path>, {
+pub fn read_from_file<P>(path: P) -> Result<(Vec<Point>, Vec<Path>)>
+    where P: AsRef<std::path::Path>, {
     let mut points: VecDeque<Point> = VecDeque::new();
     let mut paths: VecDeque<Path> = VecDeque::new();
 
@@ -132,10 +111,10 @@ where P: AsRef<std::path::Path>, {
         match values[0] {
             POINT_FORMAT_START => {
                 points.push_back(Point {
-                    x: values[1].parse()?, 
+                    x: values[1].parse()?,
                     y: values[2].parse()?,
                 });
-            },
+            }
             PATH_FORMAT_START => {
                 paths.push_back(Path {
                     start: Point {
@@ -147,10 +126,10 @@ where P: AsRef<std::path::Path>, {
                         y: values[4].parse()?,
                     },
                 });
-            },
+            }
             _ => {}
         }
     }
 
-    Ok((points, paths))
+    Ok((Vec::from(points), Vec::from(paths)))
 }
