@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::data::Point;
 
+/// A complete graph of points
 #[derive(Debug, Default, Clone)]
 pub struct Map {
     pub nodes: Vec<Point>,
@@ -18,12 +19,7 @@ impl Map {
             return None;
         }
 
-        let nodes: Vec<MapNode> = self.to_owned().nodes.iter().enumerate().map(|(iter, point)| {
-            MapNode {
-                id: iter,
-                node: point.to_owned(),
-            }
-        }).collect();
+        let nodes: Vec<MapNode> = Self::make_nodes(&self.nodes);
 
         let source: &MapNode = nodes.iter().find(|node| node.node == source.to_owned()).unwrap();
         let destination: &MapNode = nodes.iter().find(|node| node.node == destination.to_owned()).unwrap();
@@ -64,33 +60,88 @@ impl Map {
             }
 
             let best = best.unwrap();
-            path.insert(best.1, best.0.node.to_owned());
+
+            let start = &path[best.1 - 1];
+            let end = &path[best.1];
 
             distances.insert(best.0.node.to_owned(), Self::get_all_distances_for_node(&nodes, &best.0.node));
 
-            current_distance = 0f32;
-            for itr in 1..path.len() {
-                let start = &path[itr - 1].node;
-                let end = &path[itr].node;
+            current_distance -= distances[start][end];
+            current_distance += distances[start][&best.0.node];
+            current_distance += distances[&best.0.node][end];
 
-                current_distance += start.distance_to(end);
-            }
+            path.insert(best.1, best.0.node.to_owned());
 
-            println!("Found intermediate point {} - {:?}", path.len() - 2, best.0.node);
+            // println!("Found intermediate point {} - {:?}", path.len() - 2, best.0.node);
         }
 
         let path: Vec<Point> = path.iter().map(|node| node.node.to_owned()).collect();
         Some((current_distance, path))
     }
 
+    /// Preprocesses nodes to find `k` points closest to a line that directly connects source with destination,
+    /// then calls [Self::find_shortest_path_with_intermediate_points] on a new Map with those points
+    pub fn find_shortest_path_with_intermediate_points_fast(&self, source: &Point, destination: &Point, k: usize) -> Option<(f32, Vec<Point>)> {
+        let mut preprocessed_nodes =  match Self::get_k_closest_to_direct_connection(self, source, destination, k) {
+            None => return None,
+            Some(nodes) => nodes,
+        };
+
+        preprocessed_nodes.push(source.to_owned());
+        preprocessed_nodes.push(destination.to_owned());
+
+        Self {
+            nodes: preprocessed_nodes
+        }.find_shortest_path_with_intermediate_points(&source, &destination, k)
+    }
+
+    /// Returns `k` points closest to a line that directly connects source with destination
+    fn get_k_closest_to_direct_connection(&self, source: &Point, destination: &Point, k: usize) -> Option<Vec<Point>> {
+        if !self.nodes.contains(source) || !self.nodes.contains(destination) || k > self.nodes.len() - 2 {
+            return None;
+        }
+
+        let nodes: Vec<MapNode> = Self::make_nodes(&self.nodes);
+
+        let source: &MapNode = nodes.iter().find(|node| node.node == source.to_owned()).unwrap();
+        let destination: &MapNode = nodes.iter().find(|node| node.node == destination.to_owned()).unwrap();
+
+        let mut distances: HashMap<MapNode, HashMap<MapNode, f32>> = HashMap::new();
+
+        distances.insert(source.to_owned(), Self::get_all_distances_for_node(&nodes, source));
+        distances.insert(destination.to_owned(), Self::get_all_distances_for_node(&nodes, destination));
+
+        let mut distance_table: BinaryHeap<MapDistanceEntry> = BinaryHeap::new();
+
+        for (node, start_distance) in &distances[source] {
+            if let Some(end_distance) = distances[destination].get(&node) {
+                if node == source {
+                    continue
+                }
+
+                distance_table.push(MapDistanceEntry {
+                    node: node.to_owned(),
+                    distance: start_distance + end_distance,
+                })
+            }
+        }
+
+        Some((0..k).map(|_| distance_table.pop().unwrap().node.node).collect())
+    }
+
+    fn make_nodes(points: &Vec<Point>) -> Vec<MapNode> {
+        points.iter().enumerate().map(|(iter, point)| {
+            MapNode {
+                id: iter,
+                node: point.to_owned(),
+            }
+        }).collect()
+    }
+
     fn get_all_distances_for_node(nodes: &Vec<MapNode>, node: &MapNode) -> HashMap<MapNode, f32> {
         let mut hash_map: HashMap<MapNode, f32> = HashMap::new();
 
         for child in nodes {
-            if child == node {
-                continue;
-            }
-
             hash_map.insert(
                 child.to_owned(),
                 node.node.distance_to(&child.node),
@@ -101,7 +152,8 @@ impl Map {
     }
 }
 
-/// Distinguished and ordered by `distance` in reverse
+/// Distinguished and ordered by `distance` reversed for binary heap min-heap use
+/// That is to say, an entry of 3.0 distance > an entry of 4.0 distance
 #[derive(Debug, Clone)]
 struct MapDistanceEntry {
     pub node: MapNode,

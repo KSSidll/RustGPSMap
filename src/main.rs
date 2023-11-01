@@ -14,9 +14,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut file: File = File::create(DATA_FILENAME)?;
 
     const N: usize = 10000;
-    const K: usize = 971;
-    const SOURCE: usize = 2;
-    const DESTINATION: usize = 8;
+    const K: usize = 100;
+    const SOURCE: usize = 8;
+    const DESTINATION: usize = 2;
     const FROM: f32 = 0.0;
     const UNTIL: f32 = 50.0;
     const ACCURACY: f32 = 0.01;
@@ -47,6 +47,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("source: {:?}", source);
     println!("destination: {:?}", destination);
+
+    let res = graph.find_shortest_path_with_intermediate_points_fast(source, destination, K);
+
+    println!("path: {:?}", res);
 
     let res = graph.find_shortest_path_with_intermediate_points(source, destination, K);
 
