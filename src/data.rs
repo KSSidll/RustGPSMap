@@ -62,8 +62,8 @@ impl Point {
         Ok(file.write_all(data.as_bytes())?)
     }
 
-    pub fn distance_to(&self, other: &Point) -> f32 {
-        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
+    pub fn distance_to(&self, other: &Point) -> f64 {
+        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt() as f64
     }
 
     pub fn generate_random(from_x: f32, until_x: f32, accuracy_x: f32, from_y: f32, until_y: f32, accuracy_y: f32) -> Point {
@@ -92,7 +92,7 @@ impl Path {
         Ok(file.write_all(data.as_bytes())?)
     }
 
-    pub fn length(&self) -> f32 {
+    pub fn length(&self) -> f64 {
         self.start.distance_to(&self.end)
     }
 }

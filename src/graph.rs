@@ -13,8 +13,29 @@ pub struct Map {
     pub nodes: Vec<Point>,
 }
 
+#[derive(Debug, Clone)]
+pub struct MapPath {
+    pub nodes: Vec<MapNode>,
+    pub length: f64,
+}
+
+impl Into<Path> for MapPath {
+    fn into(self) -> Path {
+        Path {
+            points: self.nodes.iter().map(|node| node.node.to_owned()).collect(),
+            length: self.length
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Path {
+    pub points: Vec<Point>,
+    pub length: f64,
+}
+
 impl Map {
-    pub fn find_shortest_path_with_intermediate_points_ant_colony(&self, source: &Point, destination: &Point, k: usize) -> Option<(f32, Vec<Point>)> {
+    pub fn find_shortest_path_with_intermediate_points_ant_colony(&self, source: &Point, destination: &Point, k: usize, iterations: i32, population: i32, alpha: i32, beta: i32) -> Option<Path> {
         if !self.nodes.contains(source) || !self.nodes.contains(destination) || k > self.nodes.len() - 2 {
             return None;
         }
@@ -24,29 +45,29 @@ impl Map {
         let source: &MapNode = nodes.iter().find(|node| node.node == source.to_owned()).unwrap();
         let destination: &MapNode = nodes.iter().find(|node| node.node == destination.to_owned()).unwrap();
 
-        let mut distances: HashMap<MapNode, HashMap<MapNode, f32>> = HashMap::new();
-        let mut weighted_distances: HashMap<MapNode, Vec<(MapNode, f32)>> = HashMap::new();
-        let mut pheromones: HashMap<MapNode, f32> = HashMap::new();
+        let mut distances: HashMap<MapNode, HashMap<MapNode, f64>> = HashMap::new();
+        let mut weighted_distances: HashMap<MapNode, Vec<(MapNode, f64)>> = HashMap::new();
+        let mut pheromones: HashMap<MapNode, f64> = HashMap::new();
 
         for node in &nodes {
             distances.insert(node.to_owned(), Self::get_all_distances_for_node(&nodes, node));
-            pheromones.insert(node.to_owned(), 1f32);
+            pheromones.insert(node.to_owned(), 1f64);
         }
 
         for node in &nodes {
-            weighted_distances.insert(node.to_owned(), distances[&node].iter().map(|(node, &distance)| (node.to_owned(), (1.0 / (distance + distances[&node][&destination])).powi(19))).collect::<Vec<(MapNode, f32)>>().to_owned());
+            weighted_distances.insert(node.to_owned(), distances[&node].iter().map(|(node, &distance)| (node.to_owned(), (1.0 / (distance + distances[&node][&destination])).powi(alpha))).collect::<Vec<(MapNode, f64)>>().to_owned());
         }
 
         let mut rng = thread_rng();
 
-        let mut best_path = (f32::MAX, Vec::<MapNode>::new());
+        let mut best_path = MapPath { nodes: Vec::new(), length: f64::MAX };
 
-        for iteration_counter in 1..=100 {
-            let mut local_best_path = (f32::MAX, Vec::<MapNode>::new());
+        for iteration_counter in 1..=iterations {
+            let mut local_best_path = MapPath { nodes: Vec::new(), length: f64::MAX };
 
-            for ant_counter in 1..=40 {
+            for ant_counter in 1..=population {
                 let mut current_path = vec![source.to_owned()];
-                let mut current_distance: f32 = 0f32;
+                let mut current_distance: f64 = 0f64;
 
                 loop {
                     let last = current_path.last().unwrap();
@@ -55,12 +76,12 @@ impl Map {
                         current_distance += distances[&last][&destination];
                         current_path.push(destination.to_owned());
 
-                        if current_distance < local_best_path.0 {
-                            local_best_path = (current_distance, current_path.iter().map(|node| node.to_owned()).collect());
+                        if current_distance < local_best_path.length {
+                            local_best_path = MapPath { nodes: current_path.iter().map(|node| node.to_owned()).collect(), length: current_distance };
                         }
 
                         if ant_counter % 1 == 0 {
-                            println!("Iteration {} | Ant {} | Distance taken {} | Local best {} | Global best {}", iteration_counter, ant_counter, current_distance, local_best_path.0, best_path.0);
+                            println!("Iteration {} | Ant {} | Distance taken {} | Local best {} | Global best {}", iteration_counter, ant_counter, current_distance, local_best_path.length, best_path.length);
                         }
 
                         break;
@@ -70,9 +91,9 @@ impl Map {
                         if current_path.contains(node) || node == destination {
                             (node.to_owned(), 0.0)
                         } else {
-                            (node.to_owned(), weight * pheromones[&node].powi(5))
+                            (node.to_owned(), weight * pheromones[&node].powi(beta))
                         }
-                    }).collect::<Vec<(MapNode, f32)>>().choose_weighted(&mut rng, |item| item.1).unwrap().to_owned().0;
+                    }).collect::<Vec<(MapNode, f64)>>().choose_weighted(&mut rng, |item| item.1).unwrap().to_owned().0;
 
                     pheromones.insert(choice.to_owned(), pheromones[&choice] * 1.06);
 
@@ -82,11 +103,11 @@ impl Map {
 
                 for node in &nodes {
                     let mut current_pheromones = pheromones[&node];
-                    if current_pheromones != 1f32 {
+                    if current_pheromones != 1f64 {
                         current_pheromones /= 1.02;
 
                         if current_pheromones < 1.0 {
-                            current_pheromones = 1f32;
+                            current_pheromones = 1f64;
                         }
                     }
 
@@ -95,22 +116,20 @@ impl Map {
             }
 
             for node in &nodes {
-                pheromones.insert(node.to_owned(), 1f32);
+                pheromones.insert(node.to_owned(), 1f64);
             }
 
-            if local_best_path.0 < best_path.0 {
+            if local_best_path.length < best_path.length {
                 best_path = local_best_path;
                 // println!("Local best replaced global best");
             }
 
-            for node in &best_path.1 {
-                pheromones.insert(node.to_owned(), pheromones[&node] * 1.06f32.powi(5));
+            for node in &best_path.nodes {
+                pheromones.insert(node.to_owned(), 1.06f64.powi(5));
             }
         }
 
-        let path = best_path.1.iter().map(|node| node.node.to_owned()).collect();
-
-        Some((best_path.0, path))
+        Some(best_path.into())
     }
 
     fn make_nodes(points: &Vec<Point>) -> Vec<MapNode> {
@@ -122,8 +141,8 @@ impl Map {
         }).collect()
     }
 
-    fn get_all_distances_for_node(nodes: &Vec<MapNode>, node: &MapNode) -> HashMap<MapNode, f32> {
-        let mut hash_map: HashMap<MapNode, f32> = HashMap::new();
+    fn get_all_distances_for_node(nodes: &Vec<MapNode>, node: &MapNode) -> HashMap<MapNode, f64> {
+        let mut hash_map: HashMap<MapNode, f64> = HashMap::new();
 
         for child in nodes {
             hash_map.insert(
